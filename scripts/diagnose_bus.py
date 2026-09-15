@@ -36,7 +36,9 @@ if any(bytes.fromhex(v)[:2] == HDR for v in distinct):
     print("VERDICT: real Feetech framing found - the bus works; it is a baud/ID/model mismatch.")
 elif not distinct:
     print("VERDICT: line idle. Check servo power and the board->first-servo cable.")
-elif len(distinct) <= 2:
+elif len(distinct) <= max(3, len(seen) // 5):
+    # Real data changes with sampling rate. A handful of distinct values across ~20 bauds
+    # means the UART is framing a stuck level, not decoding a signal.
     print("VERDICT: identical bytes across a wide baud range = no real data on the line.")
     print("         The adapter's transceiver is dead. Replace the board")
     print("         (Waveshare Bus Servo Adapter (A), or Feetech FE-URT-1).")
