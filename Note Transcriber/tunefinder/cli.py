@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .config import (CostWeights, GuitarSpec, PipelineConfig, RobotSpec,
+from .config import (CostWeights, GuitarSpec, PipelineConfig,
                      TranscribeSpec, Tuning, TUNINGS)
 from .tabtext import render_events
 
@@ -19,15 +19,6 @@ DEMO_TUNE = [
     (69, 4.80, 0.55), (69, 5.40, 0.55), (68, 6.00, 0.55), (68, 6.60, 0.55),
     (66, 7.20, 0.55), (66, 7.80, 0.55), (64, 8.40, 1.15),
 ]
-
-DEMO_CHORDS = [
-    # Em, C, G, D voicings as pitch stacks
-    ((40, 47, 52, 55, 59, 64), 0.0, 1.2),
-    ((48, 52, 55, 60, 64), 1.2, 1.2),
-    ((43, 47, 50, 55, 59, 67), 2.4, 1.2),
-    ((50, 57, 62, 66), 3.6, 1.2),
-]
-
 
 def build_config(args) -> PipelineConfig:
     guitar = GuitarSpec(
@@ -43,26 +34,22 @@ def build_config(args) -> PipelineConfig:
     if args.minimise_shifts:
         weights.hand_shift *= 2.0
     transcribe_spec = TranscribeSpec(
-        polyphonic=args.poly,
         min_note_seconds=args.min_note,
         min_confidence=args.min_confidence,
-        chord_window=args.chord_window,
-    )
-    robot = RobotSpec(
-        press_lead=args.press_lead,
-        strum_stagger=args.strum_stagger,
-        alternate_picking=not args.no_alternate_picking,
+        voice_low_hz=args.voice_low_hz,
+        voice_high_hz=args.voice_high_hz,
+        noise_reduction_strength=args.noise_reduction_strength,
+        voice_gate_strength=args.voice_gate_strength,
     )
     return PipelineConfig(guitar=guitar, weights=weights,
-                          transcribe=transcribe_spec, robot=robot)
+                          transcribe=transcribe_spec)
 
 
 def add_common(p: argparse.ArgumentParser) -> None:
-    p.add_argument("-o", "--out", default=None, help="write the robot JSON here")
+    p.add_argument("-o", "--out", default=None, help="write the timed transcription JSON here")
     p.add_argument("--tab", default=None, help="write the ASCII tab here")
     p.add_argument("--strtab", default=None,
-                   help="write the compact STRING-FRET timing file here, "
-                        "for a robotics protocol (see tabtext.render_string_tab)")
+                   help="write the compact STRING-FRET timing file here")
     p.add_argument("--preview", default=None,
                    help="render the result to a WAV with a plucked string model")
     p.add_argument("--tuning", default="standard", choices=sorted(TUNINGS))
@@ -70,15 +57,18 @@ def add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--max-fret", type=int, default=15)
     p.add_argument("--max-span", type=int, default=4)
     p.add_argument("--no-open-strings", action="store_true")
-    p.add_argument("--poly", action="store_true", help="chord mode (experimental)")
     p.add_argument("--quantize", type=int, default=16,
                    help="snap to 1/N of a beat, 0 disables")
     p.add_argument("--min-note", type=float, default=0.045)
     p.add_argument("--min-confidence", type=float, default=0.5)
-    p.add_argument("--chord-window", type=float, default=0.045)
-    p.add_argument("--press-lead", type=float, default=0.060)
-    p.add_argument("--strum-stagger", type=float, default=0.018)
-    p.add_argument("--no-alternate-picking", action="store_true")
+    p.add_argument("--voice-isolation", action="store_true",
+                   help="foreground-clean a vocal/hummed source before tracking")
+    p.add_argument("--raw-mic", action="store_true",
+                   help="disable microphone voice isolation (debugging)")
+    p.add_argument("--voice-low-hz", type=float, default=65.0)
+    p.add_argument("--voice-high-hz", type=float, default=2600.0)
+    p.add_argument("--noise-reduction-strength", type=float, default=1.6)
+    p.add_argument("--voice-gate-strength", type=float, default=1.8)
     p.add_argument("--prefer-low-frets", action="store_true")
     p.add_argument("--minimise-shifts", action="store_true")
     p.add_argument("--events", action="store_true", help="print the event table")
@@ -109,8 +99,7 @@ def emit(doc, arranged, cfg, args) -> None:
         print(f"tempo {doc['timing']['tempo_bpm']} bpm | "
               f"{s.get('notes', 0)} notes in {s.get('groups', 0)} events | "
               f"max fret {s.get('max_fret', 0)} | "
-              f"{s.get('hand_shifts', 0)} hand shifts | "
-              f"{len(doc['commands'])} robot commands")
+              f"{s.get('hand_shifts', 0)} hand shifts")
         for wmsg in doc["warnings"][:8]:
             print(f"  warning: {wmsg}")
         if len(doc["warnings"]) > 8:
@@ -121,8 +110,18 @@ def emit(doc, arranged, cfg, args) -> None:
 
 def cmd_transcribe(args) -> int:
     from .pipeline import run
+    from .media import MediaInputError
+
     cfg = build_config(args)
-    doc, arranged, _ = run(args.input, cfg, quantize=args.quantize or None)
+    try:
+        doc, arranged, _ = run(
+            args.input, cfg, quantize=args.quantize or None,
+            voice_isolation=args.voice_isolation,
+            force_single_notes=True,
+        )
+    except MediaInputError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     emit(doc, arranged, cfg, args)
     return 0
 
@@ -133,16 +132,15 @@ def cmd_demo(args) -> int:
 
     cfg = build_config(args)
     sr = cfg.transcribe.sr
-    if args.chords:
-        cfg.transcribe.polyphonic = True
-        events = [(m, s, d) for stack, s, d in DEMO_CHORDS for m in stack]
-    else:
-        events = DEMO_TUNE
+    events = DEMO_TUNE
     y = synth_notes(events, sr=sr)
     if args.write_audio:
         write_wav(args.write_audio, y, sr)
-    doc, arranged, _ = run((y, sr), cfg, quantize=args.quantize or None)
-    doc["source"]["file"] = "demo:chords" if args.chords else "demo:melody"
+    doc, arranged, _ = run(
+        (y, sr), cfg, quantize=args.quantize or None,
+        force_single_notes=True,
+    )
+    doc["source"]["file"] = "demo:melody"
     emit(doc, arranged, cfg, args)
     return 0
 
@@ -155,7 +153,11 @@ def cmd_listen(args) -> int:
     if not args.quiet:
         print(f"recording {args.seconds:.1f}s ...", file=sys.stderr)
     y = record_audio(args.seconds, cfg.transcribe.sr)
-    doc, arranged, _ = run((y, cfg.transcribe.sr), cfg, quantize=args.quantize or None)
+    doc, arranged, _ = run(
+        (y, cfg.transcribe.sr), cfg, quantize=args.quantize or None,
+        voice_isolation=not args.raw_mic,
+        force_single_notes=True,
+    )
     doc["source"]["file"] = "microphone"
     emit(doc, arranged, cfg, args)
     return 0
@@ -176,39 +178,54 @@ def cmd_ui(args) -> int:
 
 def cmd_validate(args) -> int:
     doc = json.loads(Path(args.file).read_text())
-    problems = []
-    if doc.get("format", "").split("/")[0] != "robotab":
-        problems.append("not a robotab document")
-    last_t = -1.0
-    for c in doc.get("commands", []):
-        if c["t"] < last_t - 1e-6:
-            problems.append(f"commands out of order at seq {c.get('seq')}")
-        last_t = c["t"]
-    held = {}
-    for c in doc.get("commands", []):
-        if c["arm"] != "fret":
-            continue
-        if c["action"] == "press":
-            if c["string"] in held:
-                problems.append(f"double press on string {c['string']} at t={c['t']}")
-            held[c["string"]] = c["fret"]
-        elif c["action"] == "release":
-            held.pop(c["string"], None)
-        elif c["action"] == "release_all":
-            held.clear()
-    infeasible = [c for c in doc.get("commands", [])
-                  if c.get("action") == "move" and c.get("feasible") is False]
-    for c in infeasible:
-        problems.append(f"infeasible hand move at t={c['t']} to fret {c['position']}")
+    problems = validate_document(doc)
 
-    print(f"{doc.get('format')} | {len(doc.get('notes', []))} notes | "
-          f"{len(doc.get('commands', []))} commands")
+    print(f"{doc.get('format')} | {len(doc.get('notes', []))} notes")
     if problems:
         for p in problems[:20]:
             print(f"  problem: {p}")
         return 1
-    print("  ok: command stream is ordered, consistent and physically feasible")
+    print("  ok: notes are ordered, non-overlapping and physically placed")
     return 0
+
+
+def validate_document(doc: dict) -> list[str]:
+    """Return structural and timing problems in a transcription document."""
+    problems = []
+    if doc.get("format") != "tunefinder/1.0":
+        problems.append("not a tunefinder transcription document")
+        return problems
+    notes = doc.get("notes", [])
+    if not isinstance(notes, list):
+        return problems + ["notes must be a list"]
+    previous_end = -1e-6
+    previous_onset = -1e-6
+    for index, note in enumerate(notes):
+        for field in ("onset_s", "duration_s", "midi", "string", "fret"):
+            if field not in note:
+                problems.append(f"note {index} is missing {field}")
+        if not all(field in note for field in ("onset_s", "duration_s", "string", "fret")):
+            continue
+        try:
+            onset = float(note["onset_s"])
+            duration = float(note["duration_s"])
+            string = int(note["string"])
+            fret = int(note["fret"])
+        except (TypeError, ValueError):
+            problems.append(f"note {index} has a non-numeric timing or placement")
+            continue
+        end = onset + duration
+        if onset < previous_onset - 1e-6:
+            problems.append(f"notes out of order at note {index}")
+        if onset < previous_end - 1e-6:
+            problems.append(f"overlapping notes at note {index}")
+        if duration <= 0:
+            problems.append(f"note {index} has non-positive duration")
+        if string < 0 or fret < 0:
+            problems.append(f"note {index} has a negative string or fret")
+        previous_onset = onset
+        previous_end = max(previous_end, end)
+    return problems
 
 
 def main(argv=None) -> int:
@@ -218,13 +235,12 @@ def main(argv=None) -> int:
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_t = sub.add_parser("transcribe", help="transcribe an audio file")
+    p_t = sub.add_parser("transcribe", help="transcribe local media or a YouTube URL")
     p_t.add_argument("input")
     add_common(p_t)
     p_t.set_defaults(func=cmd_transcribe)
 
     p_d = sub.add_parser("demo", help="run the pipeline on a synthetic tune")
-    p_d.add_argument("--chords", action="store_true")
     p_d.add_argument("--write-audio", default=None)
     add_common(p_d)
     p_d.set_defaults(func=cmd_demo)
@@ -234,7 +250,7 @@ def main(argv=None) -> int:
     add_common(p_l)
     p_l.set_defaults(func=cmd_listen)
 
-    p_v = sub.add_parser("validate", help="check a robotab JSON file")
+    p_v = sub.add_parser("validate", help="check a timed transcription JSON file")
     p_v.add_argument("file")
     p_v.set_defaults(func=cmd_validate)
 

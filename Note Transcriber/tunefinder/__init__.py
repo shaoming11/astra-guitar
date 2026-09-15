@@ -1,10 +1,9 @@
-"""tunefinder: audio in, guitar tab and a robot command stream out."""
+"""tunefinder: audio in, timed single-note melody and guitar tab out."""
 
 from .config import (
     CostWeights,
     GuitarSpec,
     PipelineConfig,
-    RobotSpec,
     TranscribeSpec,
     Tuning,
     TUNINGS,
@@ -19,7 +18,6 @@ __all__ = [
     "Tuning",
     "TUNINGS",
     "CostWeights",
-    "RobotSpec",
     "TranscribeSpec",
     "NoteEvent",
     "Placement",

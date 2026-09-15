@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -14,7 +16,10 @@ from tunefinder.config import GuitarSpec, CostWeights, TranscribeSpec   # noqa: 
 from tunefinder.fretboard import (assign_fingers, enumerate_shapes,     # noqa: E402
                                   positions_for)
 from tunefinder.synth import karplus_strong, synth_notes                # noqa: E402
-from tunefinder.types import Placement, midi_to_hz                      # noqa: E402
+from tunefinder.types import NoteEvent, Placement, midi_to_hz             # noqa: E402
+from tunefinder.media import is_youtube_url, load_media                # noqa: E402
+from tunefinder.transcribe import isolate_humming                       # noqa: E402
+from tunefinder.timing import force_monophonic                           # noqa: E402
 
 
 # --------------------------------------------------------------- fretboard
@@ -112,7 +117,7 @@ def test_out_of_range_notes_are_folded_not_dropped():
         assert n["midi"] >= lo
 
 
-# ------------------------------------------------------------ robot output
+# ------------------------------------------------------------ transcription output
 
 def _demo_doc():
     cfg = PipelineConfig()
@@ -121,65 +126,18 @@ def _demo_doc():
     return run((y, cfg.transcribe.sr), cfg)
 
 
-def test_commands_are_time_ordered():
-    doc, _, _ = _demo_doc()
-    times = [c["t"] for c in doc["commands"]]
-    assert times == sorted(times)
-    assert [c["seq"] for c in doc["commands"]] == list(range(len(doc["commands"])))
-
-
-def test_every_press_lands_before_its_pluck():
-    doc, _, _ = _demo_doc()
-    plucks = {c["note_id"]: c["t"] for c in doc["commands"]
-              if c["arm"] == "pick" and "note_id" in c}
-    for c in doc["commands"]:
-        if c["arm"] == "fret" and c["action"] == "press":
-            assert c["t"] <= plucks[c["note_id"]] + 1e-6, (
-                f"finger lands after the pluck for {c['note_id']}"
-            )
-
-
-def test_no_string_is_pressed_twice_without_release():
-    doc, _, _ = _demo_doc()
-    held = {}
-    for c in doc["commands"]:
-        if c["arm"] != "fret":
-            continue
-        if c["action"] == "press":
-            assert c["string"] not in held
-            held[c["string"]] = c["fret"]
-        elif c["action"] == "release":
-            held.pop(c["string"], None)
-        elif c["action"] == "release_all":
-            held.clear()
-
-
-def test_open_strings_produce_no_fret_commands():
-    cfg = PipelineConfig()
-    y = synth_notes([(64, 0.0, 0.6)], sr=cfg.transcribe.sr)   # open high E
-    doc, _, _ = run((y, cfg.transcribe.sr), cfg)
-    assert doc["notes"][0]["fret"] == 0
-    assert doc["notes"][0]["finger"] == 0
-    presses = [c for c in doc["commands"] if c.get("action") == "press"]
-    assert presses == []
-
-
-def test_hand_moves_are_feasible():
-    doc, _, _ = _demo_doc()
-    for c in doc["commands"]:
-        if c.get("action") == "move":
-            assert c["feasible"] is True
-
-
 def test_document_shape():
     doc, _, _ = _demo_doc()
-    assert doc["format"] == "robotab/1.0"
-    for key in ("instrument", "timing", "robot", "stats", "notes", "commands", "tab"):
+    assert doc["format"] == "tunefinder/1.0"
+    assert "robot" not in doc
+    assert "commands" not in doc
+    for key in ("instrument", "timing", "stats", "notes", "string_tab", "tab"):
         assert key in doc
     for n in doc["notes"]:
         assert 0 <= n["string"] < cfgless_n_strings()
         assert 0 <= n["fret"] <= 15
         assert 0 <= n["finger"] <= 4
+        assert "string_fret" in n
         assert abs(n["freq_hz"] - midi_to_hz(n["midi"])) < 0.01
 
 
@@ -227,7 +185,7 @@ def test_chord_recognition():
               ((43, 47, 50, 55, 59, 67), 2.4), ((50, 57, 62, 66), 3.6)]
     events = [(m, s, 1.2) for stack, s in stacks for m in stack]
     y = synth_notes(events, sr=cfg.transcribe.sr)
-    doc, arranged, _ = run((y, cfg.transcribe.sr), cfg)
+    doc, arranged, _ = run((y, cfg.transcribe.sr), cfg, force_single_notes=False)
     assert len(arranged) == 4
     shapes = [{p.string: p.fret for p in g.shape.placements} for g in arranged]
     assert shapes[0] == {0: 0, 1: 2, 2: 2, 3: 0, 4: 0, 5: 0}       # Em
@@ -242,8 +200,61 @@ def test_silence_produces_an_empty_but_valid_document():
     doc, arranged, _ = run((y, sr), PipelineConfig())
     assert arranged == []
     assert doc["notes"] == []
-    assert doc["commands"] == []
-    assert doc["format"] == "robotab/1.0"
+    assert doc["string_tab"].startswith("# tunefinder stringtab v1")
+    assert doc["format"] == "tunefinder/1.0"
+
+
+# -------------------------------------------------------------- media / hum
+
+def test_youtube_url_detection():
+    assert is_youtube_url("https://www.youtube.com/watch?v=abc")
+    assert is_youtube_url("https://youtu.be/abc")
+    assert not is_youtube_url("https://example.com/video.mp4")
+
+
+def test_local_video_is_decoded_to_mono_audio(tmp_path):
+    """A video upload is treated as an audio source without a video library."""
+    if shutil.which("ffmpeg") is None:
+        return  # FFmpeg is an external runtime requirement for media input.
+    video = tmp_path / "clip.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-nostdin", "-v", "error",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=0.4",
+            "-f", "lavfi", "-i", "color=c=black:s=160x120:d=0.4",
+            "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video),
+        ],
+        check=True,
+    )
+    y, sr = load_media(video, 22050)
+    assert sr == 22050
+    assert y.ndim == 1
+    assert y.size > 5000
+
+
+def test_humming_cleanup_suppresses_quiet_room_noise():
+    sr = 22050
+    t = np.arange(sr * 2) / sr
+    active = (t >= 0.3) & (t < 1.3)
+    voice = np.zeros_like(t)
+    voice[active] = 0.25 * np.sin(2 * np.pi * 220 * t[active])
+    noise = np.random.default_rng(1).normal(0, 0.05, t.size)
+    cleaned = isolate_humming(voice + noise, sr, TranscribeSpec())
+    active_rms = float(np.sqrt(np.mean(cleaned[int(0.4 * sr):int(1.2 * sr)] ** 2)))
+    quiet_rms = float(np.sqrt(np.mean(cleaned[int(1.5 * sr):int(1.9 * sr)] ** 2)))
+    assert np.isfinite(cleaned).all()
+    assert active_rms > quiet_rms * 20
+
+
+def test_force_monophonic_removes_simultaneous_and_overlapping_notes():
+    notes = [
+        NoteEvent(0.0, 0.5, 60, velocity=0.7, confidence=0.7),
+        NoteEvent(0.0, 0.5, 64, velocity=0.8, confidence=0.9),
+        NoteEvent(0.3, 0.4, 67, velocity=0.8, confidence=0.9),
+    ]
+    simplified = force_monophonic(notes)
+    assert [n.midi for n in simplified] == [64, 67]
+    assert simplified[0].offset <= simplified[1].onset
 
 
 if __name__ == "__main__":

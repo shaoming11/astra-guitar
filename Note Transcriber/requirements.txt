@@ -3,6 +3,7 @@ soundfile>=0.12
 numpy>=1.24
 scipy>=1.10
 sounddevice>=0.4    # microphone input, needed for `tunefinder listen`
+yt-dlp>=2024.1     # YouTube URL input; FFmpeg is also required for video/URL decoding
 
 # optional
-# jsonschema>=4.0    # validating robotab documents against the schema
+# jsonschema>=4.0    # optional schema validation

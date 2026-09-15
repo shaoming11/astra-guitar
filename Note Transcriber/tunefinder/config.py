@@ -1,4 +1,4 @@
-"""Configuration objects for the transcription -> tab -> robot pipeline."""
+"""Configuration objects for the transcription -> tab pipeline."""
 
 from __future__ import annotations
 
@@ -43,10 +43,10 @@ class Tuning:
 
 @dataclass
 class GuitarSpec:
-    """Physical limits of the instrument and of the fretting robot."""
+    """Physical limits of the instrument used for fretboard arrangement."""
 
     tuning: Tuning = field(default_factory=lambda: Tuning.get("standard"))
-    max_fret: int = 15              # highest fret the robot can reach
+    max_fret: int = 15              # highest fret to use in the arrangement
     max_span: int = 4               # fret window the fretting hand covers
     max_fingers: int = 4
     allow_open_strings: bool = True
@@ -71,8 +71,9 @@ class CostWeights:
 @dataclass
 class TranscribeSpec:
     sr: int = 22050
-    hop_length: int = 256
+    hop_length: int = 512       # fast default; UI uses the same analysis grid
     frame_length: int = 2048
+    pyin_thresholds: int = 48  # fewer candidates than librosa's default for faster tracking
     # Pitch search range. Left as None, the pipeline derives it from the
     # instrument so alternate tunings are covered automatically.
     fmin_hz: Optional[float] = None
@@ -89,19 +90,13 @@ class TranscribeSpec:
     poly_rel_threshold: float = 0.16
     poly_onset_floor: float = 0.12   # ignore onsets that are only decay tail
     chord_window: float = 0.045     # onsets closer than this = one chord
-
-
-@dataclass
-class RobotSpec:
-    """Timing and kinematics envelope for the two arms."""
-
-    press_lead: float = 0.060       # seconds the finger lands before the pluck
-    release_lag: float = 0.015      # seconds after note end before lifting
-    min_press_gap: float = 0.010    # minimum dwell between release and re-press
-    strum_stagger: float = 0.018    # per-string delay inside a strum
-    fret_travel_speed: float = 45.0  # frets per second the fret arm can slide
-    string_travel_speed: float = 22.0  # strings per second the pick arm can cross
-    alternate_picking: bool = True
+    # Microphone-only foreground cleanup.  It is deliberately opt-in at the
+    # pipeline boundary because music/video sources should not be band-limited
+    # as if they were a hummed vocal.
+    voice_low_hz: float = 65.0
+    voice_high_hz: float = 2600.0
+    noise_reduction_strength: float = 1.6
+    voice_gate_strength: float = 1.8
 
 
 @dataclass
@@ -109,7 +104,6 @@ class PipelineConfig:
     guitar: GuitarSpec = field(default_factory=GuitarSpec)
     weights: CostWeights = field(default_factory=CostWeights)
     transcribe: TranscribeSpec = field(default_factory=TranscribeSpec)
-    robot: RobotSpec = field(default_factory=RobotSpec)
 
     def to_dict(self) -> dict:
         d = asdict(self)

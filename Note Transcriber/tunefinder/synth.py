@@ -68,7 +68,7 @@ def karplus_strong(freq: float, dur: float, sr: int, damping: float = 0.996) -> 
 
 
 def render_tab_audio(note_records: Sequence[dict], sr: int = 22050, tail: float = 0.6) -> np.ndarray:
-    """Render the robot note list back to audio for A/B checking."""
+    """Render the arranged note list back to audio for A/B checking."""
     if not note_records:
         return np.zeros(int(sr * tail), dtype=np.float32)
     total = max(r["onset_s"] + r["duration_s"] for r in note_records) + tail

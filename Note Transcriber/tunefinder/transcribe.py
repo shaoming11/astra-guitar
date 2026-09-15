@@ -3,8 +3,7 @@
 Two modes:
 
 * monophonic  - pYIN fundamental tracking segmented by onsets and pitch changes.
-                Accurate on single note melodies, which is what a robot arm
-                plays first.
+                Accurate on single-note melodies.
 * polyphonic  - constant-Q peak picking at each onset with harmonic
                 suppression. Handles chords and double stops. Coarser.
 """
@@ -17,6 +16,7 @@ from typing import List, Tuple
 import numpy as np
 
 from .config import TranscribeSpec
+from .media import load_media
 from .types import NoteEvent, Transcription
 
 warnings.filterwarnings("ignore", category=UserWarning, module="librosa")
@@ -28,10 +28,84 @@ def _librosa():
 
 
 def load_audio(path: str, sr: int) -> Tuple[np.ndarray, int]:
+    """Backward-compatible alias for loading local audio/video media."""
+    y, sr_out = load_media(path, sr)
+    peak = float(np.max(np.abs(y))) if y.size else 0.0
+    if peak > 0:
+        y = y / peak
+    return y.astype(np.float32, copy=False), sr_out
+
+
+def isolate_humming(y: np.ndarray, sr: int, spec: TranscribeSpec) -> np.ndarray:
+    """Keep foreground humming and suppress steady room/background noise.
+
+    This is intentionally a conservative single-microphone cleanup rather
+    than a claim of speaker identification.  A mono recording cannot prove
+    which person produced a sound.  In practice, a voice band-pass, adaptive
+    spectral subtraction, and an RMS voice-activity gate remove fan noise,
+    keyboard noise, and quieter competing voices before pYIN sees the signal.
+    """
+    if y.size < 32:
+        return np.asarray(y, dtype=np.float32)
+
+    from scipy.signal import butter, sosfiltfilt
+
+    x = np.asarray(y, dtype=np.float32).reshape(-1)
+    x = np.nan_to_num(x, copy=False)
+    x = x - float(np.mean(x))
+    nyquist = sr / 2.0
+    low = max(20.0, min(float(spec.voice_low_hz), nyquist * 0.45))
+    high = max(low + 20.0, min(float(spec.voice_high_hz), nyquist * 0.95))
+    try:
+        sos = butter(4, [low / nyquist, high / nyquist], btype="bandpass", output="sos")
+        x = sosfiltfilt(sos, x).astype(np.float32, copy=False)
+    except ValueError:
+        # Very short or unusual sample rates should still reach the tracker.
+        pass
+
     librosa = _librosa()
-    y, sr_out = librosa.load(path, sr=sr, mono=True)
-    y = librosa.util.normalize(y)
-    return y, sr_out
+    n_fft = 1024 if x.size >= 1024 else 256
+    hop = min(256, max(64, n_fft // 4))
+    stft = librosa.stft(x, n_fft=n_fft, hop_length=hop, win_length=n_fft)
+    magnitude = np.abs(stft)
+    if magnitude.shape[1] > 2:
+        frame_energy = np.sqrt(np.mean(magnitude * magnitude, axis=0))
+        noise_count = max(1, int(round(frame_energy.size * 0.20)))
+        quiet_frames = np.argsort(frame_energy)[:noise_count]
+        noise_profile = np.median(magnitude[:, quiet_frames], axis=1, keepdims=True)
+        strength = max(0.0, float(spec.noise_reduction_strength))
+        # Wiener-style gain avoids the metallic artifacts caused by hard
+        # spectral subtraction while still pulling down stationary noise.
+        gain = (magnitude * magnitude) / (
+            magnitude * magnitude + strength * noise_profile * noise_profile + 1e-8
+        )
+        cleaned = librosa.istft(stft * gain, hop_length=hop, win_length=n_fft, length=x.size)
+        x = np.asarray(cleaned, dtype=np.float32)
+
+    # Soft-gate frames below the adaptive foreground threshold.  The gate is
+    # smooth at frame boundaries so pYIN does not interpret clicks as notes.
+    frame_rms = librosa.feature.rms(y=x, frame_length=n_fft, hop_length=hop)[0]
+    if frame_rms.size:
+        noise_floor = float(np.percentile(frame_rms, 20))
+        signal_floor = float(np.percentile(frame_rms, 55))
+        threshold = max(
+            noise_floor * max(1.15, float(spec.voice_gate_strength)),
+            signal_floor * 0.32,
+            float(np.max(frame_rms)) * 0.012,
+        )
+        softness = max(threshold - noise_floor, 1e-7)
+        frame_gain = np.clip((frame_rms - noise_floor) / softness, 0.0, 1.0)
+        frame_gain = np.convolve(frame_gain, np.ones(3) / 3.0, mode="same")
+        sample_gain = np.interp(
+            np.arange(x.size), np.arange(frame_gain.size) * hop, frame_gain,
+            left=float(frame_gain[0]), right=float(frame_gain[-1]),
+        )
+        x = x * sample_gain.astype(np.float32)
+
+    peak = float(np.max(np.abs(x))) if x.size else 0.0
+    if peak > 1e-6:
+        x = x / peak
+    return x.astype(np.float32, copy=False)
 
 
 def record_audio(seconds: float, sr: int) -> np.ndarray:
@@ -212,6 +286,7 @@ def transcribe_monophonic(y: np.ndarray, sr: int, spec: TranscribeSpec) -> List[
         sr=sr,
         frame_length=spec.frame_length,
         hop_length=spec.hop_length,
+        n_thresholds=spec.pyin_thresholds,
     )
     times = librosa.frames_to_time(np.arange(f0.size), sr=sr, hop_length=spec.hop_length)
 
@@ -427,13 +502,23 @@ def estimate_tempo(y: np.ndarray, sr: int, hop_length: int) -> Tuple[float, List
     return bpm, [float(b) for b in np.atleast_1d(beats)]
 
 
-def transcribe(path_or_audio, spec: TranscribeSpec, source: str = "") -> Transcription:
-    """Full front end. Accepts a file path or a (samples, sr) tuple."""
+def transcribe(
+    path_or_audio,
+    spec: TranscribeSpec,
+    source: str = "",
+    voice_isolation: bool = False,
+    estimate_timing: bool = True,
+) -> Transcription:
+    """Full front end. Accepts audio samples, a local media file, or a URL."""
     if isinstance(path_or_audio, tuple):
         y, sr = path_or_audio
     else:
-        y, sr = load_audio(str(path_or_audio), spec.sr)
+        y, sr = load_media(str(path_or_audio), spec.sr)
         source = source or str(path_or_audio)
+
+    y = np.asarray(y, dtype=np.float32).reshape(-1)
+    if voice_isolation:
+        y = isolate_humming(y, int(sr), spec)
 
     if spec.polyphonic:
         notes = transcribe_polyphonic(y, sr, spec)
@@ -441,7 +526,10 @@ def transcribe(path_or_audio, spec: TranscribeSpec, source: str = "") -> Transcr
         notes = transcribe_monophonic(y, sr, spec)
     notes = group_chords(notes, spec.chord_window)
 
-    bpm, beats = estimate_tempo(y, sr, spec.hop_length)
+    if estimate_timing:
+        bpm, beats = estimate_tempo(y, sr, spec.hop_length)
+    else:
+        bpm, beats = 0.0, []
     return Transcription(
         notes=notes,
         tempo_bpm=bpm,
@@ -450,5 +538,5 @@ def transcribe(path_or_audio, spec: TranscribeSpec, source: str = "") -> Transcr
         sr=sr,
         source=source,
         polyphonic=spec.polyphonic,
-        meta={"n_samples": int(len(y))},
+        meta={"n_samples": int(len(y)), "voice_isolated": bool(voice_isolation)},
     )

@@ -81,6 +81,37 @@ def quantize_notes(
     return notes
 
 
+def force_monophonic(notes: List[NoteEvent], min_duration: float = 0.045) -> List[NoteEvent]:
+    """Collapse simultaneous/overlapping detections into one melody line.
+
+    This is useful when simplifying a full song or a noisy recording for a
+    one-note instrument.  When multiple notes start together, the strongest
+    and most confident detection wins.  Later notes trim an earlier overlap,
+    so the returned events never sound at the same time.
+    """
+    ordered = sorted(notes, key=lambda n: (n.onset, -n.confidence, -n.velocity, n.midi))
+    out: List[NoteEvent] = []
+    for note in ordered:
+        if out and abs(note.onset - out[-1].onset) <= 1e-6:
+            previous = out[-1]
+            previous_score = previous.confidence * 0.7 + previous.velocity * 0.3
+            note_score = note.confidence * 0.7 + note.velocity * 0.3
+            if note_score > previous_score:
+                out[-1] = note
+            continue
+
+        if out and note.onset < out[-1].offset:
+            out[-1].duration = note.onset - out[-1].onset
+            if out[-1].duration < min_duration:
+                out.pop()
+        if note.duration >= min_duration:
+            out.append(note)
+
+    for index, note in enumerate(out):
+        note.group = index
+    return out
+
+
 def fit_to_range(notes: List[NoteEvent], guitar: GuitarSpec) -> int:
     """Fold notes outside the instrument range into it by whole octaves.
 

@@ -89,7 +89,7 @@ def string_letters(open_midi: Sequence[int]) -> List[str]:
 
 
 def render_string_tab(doc: dict) -> str:
-    """Compact timing + STRING-FRET format for a robotics protocol.
+    """Compact timing + STRING-FRET format for one-note playback.
 
     One note per line, time-ordered, whitespace-delimited, comments prefixed
     with '#' so a minimal line-oriented parser on the controller side can

@@ -1,8 +1,8 @@
 """Turn detected pitches into a fretting path.
 
 The fretboard is ambiguous: middle C sits in four places on a standard guitar.
-Choosing note by note produces a tab a human, or a robot, cannot physically
-play. This module picks the whole path at once with a Viterbi search whose
+Choosing note by note produces a tab that can be awkward to play. This module
+picks the whole path at once with a Viterbi search whose
 emission cost is shape difficulty and whose transition cost is hand travel.
 """
 
@@ -129,7 +129,6 @@ def arrangement_stats(arranged: Sequence[ArrangedGroup], cfg: PipelineConfig) ->
     return {
         "groups": len(arranged),
         "notes": sum(len(g.notes) for g in arranged),
-        "chords": sum(1 for g in arranged if len(g.shape.placements) > 1),
         "open_strings": sum(1 for f in frets if f == 0),
         "max_fret": max(frets) if frets else 0,
         "mean_fret": round(float(np.mean(frets)), 2) if frets else 0.0,
