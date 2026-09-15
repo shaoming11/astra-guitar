@@ -21,9 +21,15 @@ ap.add_argument("--scan", action="store_true", help="list motors on the bus and 
 args = ap.parse_args()
 
 bus = FeetechMotorsBus(port=args.port, motors={"m": Motor(1, "sts3215", MotorNormMode.RANGE_M100_100)})
-bus.connect(handshake=False)
+bus._connect(handshake=False)          # no torque writes; the bus may be empty
 found = bus.broadcast_ping() or {}
 print(f"on the bus: {sorted(found)}")
+if not found:
+    print("\nNOTHING RESPONDED. The USB adapter enumerated but no servo answered. Check:")
+    print("  1. servo power brick plugged into the bus board AND the wall (USB alone is not enough)")
+    print("  2. the 3-pin cable from the board to the first servo is seated")
+    print("  3. you are on the board that actually has an arm attached")
+    bus.disconnect(disable_torque=False); sys.exit(1)
 
 if args.scan:
     bus.disconnect(); sys.exit(0)
