@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/robotab-1.0.schema.json",
+  "title": "robotab/1.0",
+  "description": "A guitar performance for two robot arms. All times are seconds from the start of the take. String index 0 is the lowest pitched string.",
+  "type": "object",
+  "required": ["format", "instrument", "timing", "notes", "commands"],
+  "properties": {
+    "format": { "const": "robotab/1.0" },
+    "generated_utc": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" },
+        "duration_s": { "type": "number", "minimum": 0 },
+        "sample_rate": { "type": "integer" },
+        "mode": { "enum": ["monophonic", "polyphonic"] }
+      }
+    },
+    "instrument": {
+      "type": "object",
+      "required": ["tuning", "open_midi", "max_fret"],
+      "properties": {
+        "type": { "type": "string" },
+        "tuning": { "type": "string" },
+        "open_midi": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 127 },
+          "description": "MIDI pitch of each open string, lowest pitched first."
+        },
+        "string_index": { "type": "string" },
+        "max_fret": { "type": "integer", "minimum": 1 },
+        "capo": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "required": ["tempo_bpm"],
+      "properties": {
+        "tempo_bpm": { "type": "number", "exclusiveMinimum": 0 },
+        "time_signature": { "type": "string" },
+        "quantized_subdivision": { "type": ["integer", "null"] },
+        "beat_times": { "type": "array", "items": { "type": "number" } },
+        "clock": { "type": "string" }
+      }
+    },
+    "robot": {
+      "type": "object",
+      "properties": {
+        "press_lead_s": { "type": "number", "minimum": 0 },
+        "release_lag_s": { "type": "number", "minimum": 0 },
+        "strum_stagger_s": { "type": "number", "minimum": 0 },
+        "arms": { "type": "array", "items": { "enum": ["fret", "pick"] } }
+      }
+    },
+    "stats": { "type": "object" },
+    "notes": {
+      "type": "array",
+      "description": "One entry per sounded note, in time order.",
+      "items": {
+        "type": "object",
+        "required": ["id", "onset_s", "duration_s", "midi", "string", "fret", "finger"],
+        "properties": {
+          "id": { "type": "string" },
+          "group": { "type": "integer", "description": "Notes sharing a group are struck together." },
+          "onset_s": { "type": "number", "minimum": 0 },
+          "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+          "beat": { "type": ["number", "null"] },
+          "measure": { "type": ["integer", "null"] },
+          "midi": { "type": "integer", "minimum": 0, "maximum": 127 },
+          "pitch": { "type": "string" },
+          "freq_hz": { "type": "number" },
+          "string": { "type": "integer", "minimum": 0 },
+          "string_label": { "type": "string", "description": "Guitarist facing string number." },
+          "fret": { "type": "integer", "minimum": 0 },
+          "finger": {
+            "type": "integer", "minimum": 0, "maximum": 4,
+            "description": "0 is an open string, 1 is the index finger."
+          },
+          "open": { "type": "boolean" },
+          "velocity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "strum_direction": { "enum": ["down", "up", null] },
+          "pick_direction": { "enum": ["down", "up"] },
+          "hand_position": { "type": "integer", "minimum": 0 },
+          "barre": {
+            "type": ["array", "null"],
+            "items": { "type": "integer" },
+            "minItems": 3, "maxItems": 3,
+            "description": "[fret, lowest string, highest string]"
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "description": "The executable timeline, sorted by t then by arm.",
+      "items": {
+        "type": "object",
+        "required": ["t", "arm", "action", "seq"],
+        "properties": {
+          "t": { "type": "number", "minimum": 0 },
+          "seq": { "type": "integer", "minimum": 0 },
+          "arm": { "enum": ["fret", "pick"] },
+          "action": {
+            "enum": ["press", "release", "release_all", "move", "pluck", "strum", "rest"]
+          },
+          "string": { "type": "integer", "minimum": 0 },
+          "fret": { "type": "integer", "minimum": 0 },
+          "finger": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "direction": { "enum": ["down", "up"] },
+          "velocity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "position": { "type": "integer", "minimum": 0, "description": "Target index finger fret for a move." },
+          "from_position": { "type": ["integer", "null"] },
+          "travel_s": { "type": "number", "minimum": 0 },
+          "feasible": { "type": "boolean" },
+          "pre_take": { "type": "boolean", "description": "Setup before the clock starts." },
+          "note_id": { "type": "string" },
+          "barre": { "type": ["array", "null"] }
+        }
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "tab": { "type": "string", "description": "ASCII tab for human inspection." }
+  }
+}
