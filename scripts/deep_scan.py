@@ -1,11 +1,12 @@
 """Brute-force scan: every supported model/protocol x every baud rate."""
 from lerobot.motors.feetech import FeetechMotorsBus
 from lerobot.motors import Motor, MotorNormMode
-from lerobot.motors.feetech.tables import MODEL_BAUDRATE_TABLE
+from lerobot.motors.feetech.tables import MODEL_BAUDRATE_TABLE, MODEL_PROTOCOL
 PORT = "/dev/cu.usbmodem5A7C1220421"
 hits = []
 for model in ["sts3215", "sts3250", "sm8512bl", "scs0009"]:
-    bus = FeetechMotorsBus(port=PORT, motors={"m": Motor(1, model, MotorNormMode.RANGE_M100_100)})
+    bus = FeetechMotorsBus(port=PORT, motors={"m": Motor(1, model, MotorNormMode.RANGE_M100_100)},
+                           protocol_version=MODEL_PROTOCOL[model])
     bus._connect(handshake=False)
     for br in sorted(MODEL_BAUDRATE_TABLE[model], reverse=True):
         try:
