@@ -5,7 +5,8 @@ from song import schedule
 from scorer import grade, summary
 import string_model as sm
 
-def run(press_mm=2.0, behind_mm=8.0, pluck=0.6, save_wav=None, verbose=True):
+def run(press_mm=2.0, behind_mm=8.0, pluck=0.6, save_wav=None, verbose=True, secret=None):
+    if secret: sm.apply_secret(secret)
     rig, plan = Rig(), schedule()
     for step in plan:
         rig.fret(step["fret"], press_mm=press_mm, behind_mm=behind_mm)

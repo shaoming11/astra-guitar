@@ -13,15 +13,22 @@ from scorer import summary
 RUNS = Path(__file__).resolve().parents[1] / "runs"
 
 class Session:
-    def __init__(self, name=None):
+    """A blind session: physics thresholds are drawn from `seed` and sealed to disk.
+    The agent sees only scorer feedback."""
+    def __init__(self, name=None, seed=None, budget=12):
         self.dir = RUNS / (name or time.strftime("sim-%Y%m%d-%H%M%S"))
         self.dir.mkdir(parents=True, exist_ok=True)
-        self.turn = 0
+        self.turn = 0; self.budget = budget; self.secret = None
+        if seed is not None:
+            import hidden as sealed
+            self.secret = sealed.seal(seed, self.dir / "SEALED_do_not_read.json")
 
     def attempt(self, reason, **params):
         self.turn += 1
+        if self.turn > self.budget:
+            raise RuntimeError(f"turn budget of {self.budget} exhausted")
         g, rig = run(**params, save_wav=str(self.dir / f"attempt_{self.turn}.wav"),
-                     verbose=False)
+                     verbose=False, secret=self.secret)
         rec = {"turn": self.turn, "reason": reason, "params": params,
                "score": g["score"], "clean": g["clean"], "total": g["total"],
                "summary": summary(g), "notes": g["notes"]}

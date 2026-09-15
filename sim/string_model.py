@@ -15,10 +15,18 @@ from build_scene import fret_x, string_y, STRING_Z, SCALE_LEN, LIVE_STRING
 
 SR = 44100
 OPEN_HZ = 110.0          # A string, standard tuning
+# Defaults; overwritten per run by secrets.draw() so the agent cannot read them off.
 MIN_PRESS_MM = 1.2       # below this the string is not properly stopped
 GOOD_PRESS_MM = 2.0
 MAX_PRESS_MM = 6.0       # beyond this the string bends sharp
-FRET_WINDOW = 0.020      # must land within 20 mm behind the fret wire
+FRET_WINDOW = 0.020      # must land within this distance behind the fret wire
+MIN_PLUCK = 0.02
+
+def apply_secret(s):
+    global MIN_PRESS_MM, GOOD_PRESS_MM, MAX_PRESS_MM, FRET_WINDOW, MIN_PLUCK
+    MIN_PRESS_MM = s["MIN_PRESS_MM"]; GOOD_PRESS_MM = s["GOOD_PRESS_MM"]
+    MAX_PRESS_MM = s["MAX_PRESS_MM"]; FRET_WINDOW = s["FRET_WINDOW_MM"] / 1000.0
+    MIN_PLUCK = s["MIN_PLUCK"]
 NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 
 def hz_to_name(hz):
@@ -54,7 +62,7 @@ def sound_note(press, pluck_speed):
     freq = OPEN_HZ * 2 ** (fret / 12.0)
     d, behind = press["depth_mm"], press["behind_fret_mm"]
     q = "clean"
-    if pluck_speed < 0.02:
+    if pluck_speed < MIN_PLUCK:
         return freq, "silent"
     if press["pressed"]:
         if d < GOOD_PRESS_MM:                 q = "buzz"       # not stopping cleanly

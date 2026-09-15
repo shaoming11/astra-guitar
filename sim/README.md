@@ -55,3 +55,39 @@ Audio verified by FFT on the rendered waveform: 164, 164, 196, 164, 148, 132, 12
 Note *timing* is not yet controlled — `song.py` emits `at_ms` but `rig.py` plays each note as
 fast as IK settling allows, so the riff comes out evenly spaced. Adding a scheduler is the
 next step, and gives the agent a second thing to learn (servo lag pre-compensation).
+
+## Blind benchmark (`hidden.py`)
+
+The first run above is not a fair test: I wrote `string_model.py`, so I knew the thresholds.
+`hidden.py` fixes that — five physics constants are drawn per seed and sealed to
+`runs/<name>/SEALED_do_not_read.json`, which the agent never reads. It learns the rig's
+limits only from scorer feedback.
+
+The draw ranges are tuned so no fixed guess wins: the viable press band is 0.6–1.8 mm wide
+and sits anywhere in 1–6 mm. Best possible single fixed guess scores **26%** of seeds
+(it was 64% before hardening — the first version of this benchmark was too easy, and my
+"2 turns every time" result on seeds 7331/4242/8815 was mostly the harness, not the agent).
+
+```python
+from agent_loop import Session
+s = Session("my-run", seed=2026, budget=12)
+s.attempt("why I'm trying this", press_mm=2.0, behind_mm=8.0, pluck=0.85)
+```
+
+### Blind run, seed 2026 — hardened rig
+
+| turn | reasoning | result |
+|---|---|---|
+| 1 | Start low so the first failure shows the search direction; generous pluck so nothing is masked by silence | 1/7 — brackets the band: 1.81 mm clean, 1.05–1.29 buzz, 0.52 didn't stop the string |
+| 2 | Threshold is in (1.29, 1.81]; command 2.0 to clear it, and check whether depth spread is noise or systematic | 6/7 — only fret 3 fails |
+| 3 | Spread is **systematic**: fret 3 lands ~0.7 mm shallower than fret 7 at every commanded depth. Raise the global command to clear it | **7/7** (depths 1.92–2.59 mm) |
+
+Sealed values were `GOOD_PRESS 1.81, MAX_PRESS 2.94` — a 1.13 mm window, and the final
+depths spanned 0.67 mm across frets. It fit, but barely.
+
+### The real finding
+Depth error is a systematic function of arm configuration, not noise. `press_mm` is a single
+global parameter, so on a rig with a narrower band it is **not solvable** — the fix is a
+per-fret depth offset in the action interface, learned once and applied thereafter. That is a
+change to the tool schema, not to the agent's cleverness, and it applies identically to the
+real arm where servo droop varies with reach.

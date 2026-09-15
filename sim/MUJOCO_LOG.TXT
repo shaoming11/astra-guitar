@@ -126,3 +126,83 @@ WARNING Tue Sep 15 13:16:24 2026: Attach conflict when attaching 'so101', policy
 timestep: parent has 0.002 (default), child has 0.005, keeping parent value
 iterations: parent has 100 (default), child has 10, keeping parent value
 
+WARNING Tue Sep 15 13:21:01 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:01 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:11 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:11 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:23 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:23 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:40 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:40 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:40 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:40 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:47 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:47 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:48 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:21:48 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:22:34 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:22:34 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:23:13 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:23:13 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:23:34 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
+WARNING Tue Sep 15 13:23:34 2026: Attach conflict when attaching 'so101', policy is 'warning'
+timestep: parent has 0.002 (default), child has 0.005, keeping parent value
+iterations: parent has 100 (default), child has 10, keeping parent value
+
