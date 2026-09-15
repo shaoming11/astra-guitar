@@ -130,6 +130,23 @@ astra-guitar/
 7. **Guards module** — the only path to the servo bus.
 8. **Scripts** — `record_poses`, `calibrate_depth`, `test_scorer`, `replay <run> <turn>`.
 
+## 6b. π0.5 as System 1 (from Galbot's "Astra as an Embodied Policy")
+
+The hybrid in that paper: π0.5 proposes a 50-step joint chunk; FK turns it into end-effector
+poses Astra can read; Astra either **accepts** 1–15 steps or **corrects** with its own EEF
+target for 1–5 steps; execute; re-observe. Astra touched only 14.4% of steps and the hybrid
+used 45% fewer tokens than Astra writing every action itself. Caveat from their RoboLab run:
+with an un-tuned π0.5 the hybrid was slightly *worse* than direct Astra.
+
+Here the same shape, with a swappable proposer:
+- `PoseTableProposer` — the fret/pluck interpolator (works today; our real System 1).
+- `Pi05Proposer` — `hqfang/pi05-so100_101` on a GPU policy server; single-arm (6-D) only,
+  zero-shot, never seen a guitar. **Parked** (16.6 GB, own patched env, no benefit to the
+  audio-feedback loop) — recipe lives in SETUP.md §3 if we want the comparison chart.
+- Astra's tools become `accept(steps)` / `correct(fret, press_mm, velocity, at_ms)` instead
+  of "invent the action" — the framing that halved tokens in the paper.
+See `SETUP.md` §3–4 for wiring.
+
 ## 7. Build order
 
 1. Recorder + FakeRobot + Responses loop (software only).
