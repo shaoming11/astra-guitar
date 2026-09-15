@@ -82,7 +82,7 @@ s.attempt("why I'm trying this", press_mm=2.0, behind_mm=8.0, pluck=0.85)
 | 2 | Threshold is in (1.29, 1.81]; command 2.0 to clear it, and check whether depth spread is noise or systematic | 6/7 — only fret 3 fails |
 | 3 | Spread is **systematic**: fret 3 lands ~0.7 mm shallower than fret 7 at every commanded depth. Raise the global command to clear it | **7/7** (depths 1.92–2.59 mm) |
 
-Sealed values were `GOOD_PRESS 1.81, MAX_PRESS 2.94` — a 1.13 mm window, and the final
+Sealed values were `GOOD_PRESS 1.60, MAX_PRESS 2.81` — a 1.21 mm window, and the final
 depths spanned 0.67 mm across frets. It fit, but barely.
 
 ### The real finding
