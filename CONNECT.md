@@ -200,8 +200,16 @@ whether the returned bytes **change**. That is the discriminator, not whether by
 .venv/bin/python scripts/diagnose_bus.py /dev/cu.usbmodemXXXX
 ```
 
-**2026-09-15:** arm A's board returned `000080bf03` identically for every baud from 9600 to
-256000, and `8080c000` identically from 460800 to 1.5M. Real serial data cannot be invariant
-across a 26× sampling-rate change, so there was no data on the line — dead transceiver,
-despite the board enumerating on USB and all servo LEDs being lit. Replacement ordered.
-Lesson: LEDs prove VCC only; the data wire is an independent conductor and fails on its own.
+**2026-09-15:** the bus went silent and stayed silent. First reading of the sweep was that
+the reply was invariant across baud rates, implying no signal at all — that conclusion was
+**wrong**, because only one payload had been tested. Varying the payload showed the reply
+tracks it (`55…` echoes exactly, `FF…` comes back inverted), so the adapter's UART works and
+is hearing its own transmission. That narrows it to "no servo is replying" but does **not**
+identify the culprit. Still open between: the adapter's half-duplex direction control stuck,
+servo logic unpowered (LEDs run off VCC and can light on a rail too weak for the servo MCU),
+or a broken data conductor. Disambiguate with a known-good arm on this board, a spare board
+on this arm, or a multimeter at the first servo connector.
+
+Lessons: LEDs prove VCC only — the data wire is an independent conductor that fails on its
+own. And never conclude "no signal" from a single test payload; vary it and see if the reply
+follows.
