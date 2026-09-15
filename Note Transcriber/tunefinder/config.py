@@ -51,6 +51,10 @@ class GuitarSpec:
     max_fingers: int = 4
     allow_open_strings: bool = True
     capo: int = 0
+    # Internal index 2 is the fourth physical guitar string: D in standard,
+    # drop-D, and DADGAD tuning. Keeping this fixed guarantees a single-line
+    # tab even when the source contains chords or several voices.
+    single_string: Optional[int] = 2
 
 
 @dataclass

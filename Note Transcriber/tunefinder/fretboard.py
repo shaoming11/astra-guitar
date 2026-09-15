@@ -10,9 +10,16 @@ from .types import Placement, Shape
 
 
 def positions_for(midi: int, guitar: GuitarSpec) -> List[Placement]:
-    """Every (string, fret) pair that produces this pitch on this instrument."""
+    """Every allowed (string, fret) pair that produces this pitch."""
     out: List[Placement] = []
-    for s, open_midi in enumerate(guitar.tuning.open_midi):
+    if guitar.single_string is None:
+        strings = enumerate(guitar.tuning.open_midi)
+    else:
+        index = int(guitar.single_string)
+        if index < 0 or index >= guitar.tuning.n_strings:
+            return out
+        strings = ((index, guitar.tuning.open_midi[index]),)
+    for s, open_midi in strings:
         fret = midi - open_midi - guitar.capo
         if fret < 0 or fret > guitar.max_fret:
             continue
@@ -23,6 +30,12 @@ def positions_for(midi: int, guitar: GuitarSpec) -> List[Placement]:
 
 
 def playable_range(guitar: GuitarSpec) -> Tuple[int, int]:
+    """Pitch range used for placement, narrowed to the selected string."""
+    if guitar.single_string is not None:
+        index = int(guitar.single_string)
+        if 0 <= index < guitar.tuning.n_strings:
+            lo = guitar.tuning.open_midi[index] + guitar.capo
+            return lo, lo + guitar.max_fret
     lo = min(guitar.tuning.open_midi) + guitar.capo
     hi = max(guitar.tuning.open_midi) + guitar.capo + guitar.max_fret
     return lo, hi

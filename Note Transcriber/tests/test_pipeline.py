@@ -25,7 +25,7 @@ from tunefinder.timing import force_monophonic                           # noqa:
 # --------------------------------------------------------------- fretboard
 
 def test_positions_for():
-    g = GuitarSpec()
+    g = GuitarSpec(single_string=None)
     # middle C sits in several places on a standard guitar
     spots = positions_for(60, g)
     assert (3, 5) in [(p.string, p.fret) for p in spots]
@@ -43,7 +43,7 @@ def test_span_limit_rejects_impossible_shapes():
 
 
 def test_open_chord_needs_no_barre():
-    g, w = GuitarSpec(), CostWeights()
+    g, w = GuitarSpec(single_string=None), CostWeights()
     e_minor = [40, 47, 52, 55, 59, 64]
     best = enumerate_shapes(e_minor, g, w)[0]
     assert best.barre is None
@@ -53,7 +53,7 @@ def test_open_chord_needs_no_barre():
 
 
 def test_barre_used_when_fingers_run_out():
-    g, w = GuitarSpec(), CostWeights()
+    g, w = GuitarSpec(single_string=None), CostWeights()
     f_major = [41, 48, 53, 57, 60, 65]         # F barre chord at the first fret
     best = enumerate_shapes(f_major, g, w)[0]
     assert best.barre is not None
@@ -85,7 +85,7 @@ def test_arranger_keeps_a_run_on_one_string():
     holds the run together.
     """
     cfg = PipelineConfig()
-    events = [(m, i * 0.35, 0.3) for i, m in enumerate([72, 74, 76, 77, 79])]
+    events = [(m, i * 0.35, 0.3) for i, m in enumerate([52, 54, 56, 57, 59])]
     y = synth_notes(events, sr=cfg.transcribe.sr)
     doc, arranged, _ = run((y, cfg.transcribe.sr), cfg)
     assert len({n["string"] for n in doc["notes"]}) == 1
@@ -95,8 +95,8 @@ def test_arranger_keeps_a_run_on_one_string():
 
 def test_alternate_tuning_changes_the_tab():
     """D2 is below a standard guitar. Drop D reaches it on the open low string."""
-    cfg_std = PipelineConfig()
-    cfg_drop = PipelineConfig(guitar=GuitarSpec(tuning=Tuning.get("drop_d")))
+    cfg_std = PipelineConfig(guitar=GuitarSpec(single_string=None))
+    cfg_drop = PipelineConfig(guitar=GuitarSpec(tuning=Tuning.get("drop_d"), single_string=None))
     y = synth_notes([(38, 0.0, 0.5), (50, 0.6, 0.5)], sr=cfg_std.transcribe.sr)
 
     drop, _, _ = run((y, cfg_drop.transcribe.sr), cfg_drop)
@@ -112,7 +112,7 @@ def test_out_of_range_notes_are_folded_not_dropped():
     cfg = PipelineConfig()
     y = synth_notes([(28, 0.0, 0.6), (36, 0.7, 0.6)], sr=cfg.transcribe.sr)
     doc, _, _ = run((y, cfg.transcribe.sr), cfg)
-    lo = min(cfg.guitar.tuning.open_midi)
+    lo = cfg.guitar.tuning.open_midi[cfg.guitar.single_string] + cfg.guitar.capo
     for n in doc["notes"]:
         assert n["midi"] >= lo
 
@@ -135,6 +135,8 @@ def test_document_shape():
         assert key in doc
     for n in doc["notes"]:
         assert 0 <= n["string"] < cfgless_n_strings()
+        assert n["string"] == 2
+        assert n["string_fret"].startswith("D-")
         assert 0 <= n["fret"] <= 15
         assert 0 <= n["finger"] <= 4
         assert "string_fret" in n
@@ -165,7 +167,8 @@ def _plucked_riff(sr=22050, noise=0.004):
 
 def test_pitch_accuracy_on_plucked_riff():
     y, sr = _plucked_riff()
-    doc, _, _ = run((y, sr), PipelineConfig())
+    cfg = PipelineConfig(guitar=GuitarSpec(max_fret=24))
+    doc, _, _ = run((y, sr), cfg)
     assert [n["midi"] for n in doc["notes"]] == [m for m, _, _ in RIFF]
 
 
@@ -180,7 +183,10 @@ def test_onset_accuracy_on_plucked_riff():
 
 def test_chord_recognition():
     """Open Em, C, G and D should come back as their standard voicings."""
-    cfg = PipelineConfig(transcribe=TranscribeSpec(polyphonic=True))
+    cfg = PipelineConfig(
+        guitar=GuitarSpec(single_string=None),
+        transcribe=TranscribeSpec(polyphonic=True),
+    )
     stacks = [((40, 47, 52, 55, 59, 64), 0.0), ((48, 52, 55, 60, 64), 1.2),
               ((43, 47, 50, 55, 59, 67), 2.4), ((50, 57, 62, 66), 3.6)]
     events = [(m, s, 1.2) for stack, s in stacks for m in stack]

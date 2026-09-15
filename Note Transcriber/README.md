@@ -1,6 +1,6 @@
 # tunefinder
 
-Listen to a tune. Get back a timed, single-note melody transcription with guitar string/fret placements and ASCII tab.
+Listen to a tune. Get back a timed, single-note melody transcription with every tab note arranged on the D string.
 
 The hard part is not pitch detection. It is that the fretboard is ambiguous. Middle C sits in four places on a standard guitar, and a tab that picks each note independently produces something no hand and no machine can physically play. tunefinder picks the whole fretting path at once.
 
@@ -69,7 +69,7 @@ Microphone recordings are cleaned before pitch tracking with a voice-band filter
 
 ## Output
 
-The output contains a timed JSON transcription, ASCII tab, and compact STRING-FRET timing text:
+The output contains a timed JSON transcription, ASCII tab, and compact STRING-FRET timing text. The default arrangement uses only the D string (physical string 4, internal index 2), so every note token is `D-fret` in standard tuning.
 
 **`tunefinder/1.0` JSON** (`-o` / `--out`) contains one timed note record per detected melody note. Each record includes pitch, onset, duration, guitar string, fret, finger, and a `string_fret` token such as `e-5`. Beat numbers are included when available. String index 0 is the lowest pitched string. Finger 0 is an open string, finger 1 is the index finger.
 

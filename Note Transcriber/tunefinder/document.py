@@ -67,6 +67,16 @@ def build_document(
             "tuning": cfg.guitar.tuning.name,
             "open_midi": list(cfg.guitar.tuning.open_midi),
             "string_index": "0 = lowest pitched string",
+            "single_string": cfg.guitar.single_string,
+            "single_string_label": (
+                cfg.guitar.tuning.string_label(cfg.guitar.single_string)
+                if cfg.guitar.single_string is not None else None
+            ),
+            "single_string_name": (
+                letters[cfg.guitar.single_string]
+                if cfg.guitar.single_string is not None
+                and cfg.guitar.single_string < len(letters) else None
+            ),
             "max_fret": cfg.guitar.max_fret,
             "capo": cfg.guitar.capo,
         },

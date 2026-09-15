@@ -139,6 +139,9 @@ class TunefinderUI:
         tk.Checkbutton(
             instrument, text="Minimise hand shifts", variable=self.minimise_shifts_var,
         ).grid(row=6, column=0, columnspan=2, sticky="w", padx=2)
+        tk.Label(
+            instrument, text="Output: D string only (string 4)", fg="#225522",
+        ).grid(row=7, column=0, columnspan=2, sticky="w", padx=5, pady=(4, 2))
 
         transcription = tk.LabelFrame(settings, text="Transcription")
         transcription.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)

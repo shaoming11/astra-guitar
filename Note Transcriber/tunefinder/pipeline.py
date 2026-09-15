@@ -32,7 +32,13 @@ def run(
 
     # Match the pitch search to the instrument, so alternate tunings and a
     # raised fret ceiling are covered without the caller thinking about it.
-    lo, hi = playable_range(cfg.guitar)
+    # Keep pitch detection broad when output is locked to one string. A high
+    # vocal note still needs to be detected before it is octave-folded onto
+    # the D string; narrowing pYIN to the fretboard range would lose it.
+    if cfg.guitar.single_string is None:
+        lo, hi = playable_range(cfg.guitar)
+    else:
+        lo, hi = 40, 88
     if cfg.transcribe.fmin_hz is None:
         cfg.transcribe.fmin_hz = midi_to_hz(lo - 1)
     if cfg.transcribe.fmax_hz is None:

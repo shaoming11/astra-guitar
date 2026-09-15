@@ -9,7 +9,11 @@
     "format": { "const": "tunefinder/1.0" },
     "generated_utc": { "type": "string", "format": "date-time" },
     "source": { "type": "object" },
-    "instrument": { "type": "object" },
+    "instrument": { "type": "object", "properties": {
+      "single_string": { "type": ["integer", "null"], "minimum": 0 },
+      "single_string_label": { "type": ["string", "null"] },
+      "single_string_name": { "type": ["string", "null"] }
+    } },
     "timing": { "type": "object", "required": ["tempo_bpm", "clock"] },
     "stats": { "type": "object" },
     "warnings": { "type": "array", "items": { "type": "string" } },
