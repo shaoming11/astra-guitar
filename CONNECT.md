@@ -181,3 +181,27 @@ prints the ID it found.
   skips all of this — both arms keep IDs 1–6 and both work with stock `SO101Follower`. Worth
   ordering as a backup regardless, since one PSU driving 12 servos can brown out when the
   fretting arm presses.
+
+---
+
+# Diagnosing a silent bus: is it the board or the wiring?
+
+`scripts/diagnose_bus.py` sweeps raw serial across every plausible baud rate and looks at
+whether the returned bytes **change**. That is the discriminator, not whether bytes come back:
+
+| observation | meaning |
+|---|---|
+| a reply starting `FF FF` | the bus works — it's a baud / ID / model mismatch |
+| bytes **differ** per baud | real data on the line, wrong rate |
+| bytes **identical** across a wide baud range | no data at all; the UART is framing a stuck DC level → the adapter's transceiver is dead |
+| nothing at all | line idle → check servo power and the board→first-servo cable |
+
+```bash
+.venv/bin/python scripts/diagnose_bus.py /dev/cu.usbmodemXXXX
+```
+
+**2026-09-15:** arm A's board returned `000080bf03` identically for every baud from 9600 to
+256000, and `8080c000` identically from 460800 to 1.5M. Real serial data cannot be invariant
+across a 26× sampling-rate change, so there was no data on the line — dead transceiver,
+despite the board enumerating on USB and all servo LEDs being lit. Replacement ordered.
+Lesson: LEDs prove VCC only; the data wire is an independent conductor and fails on its own.
